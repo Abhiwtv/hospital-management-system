@@ -1,0 +1,14 @@
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.rounded-4 {
+  border-radius: 1rem !important;
+}
+
+a {
+  transition: color 0.2s ease-in-out;
+}

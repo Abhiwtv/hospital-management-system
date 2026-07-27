@@ -1,0 +1,1706 @@
+openapi: 3.0.3
+info:
+  title: Hospital Management System API
+  description: >
+    REST API for a hospital management system supporting three roles —
+    Admin, Doctor, and Patient — with JWT-based authentication, appointment
+    scheduling, treatment records, AI-powered patient summaries, and a
+    post-appointment chat feature.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ─── Common ──────────────────────────────────────────────────────────────
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Unauthorized
+
+    # ─── Doctor ──────────────────────────────────────────────────────────────
+    Doctor:
+      type: object
+      properties:
+        doctor_id:
+          type: integer
+        doctor_username:
+          type: string
+        doctor_name:
+          type: string
+        doctor_email:
+          type: string
+          format: email
+        doctor_type:
+          type: string
+        doctor_qualification:
+          type: string
+        doctor_experience:
+          type: string
+        doctor_description:
+          type: string
+        dep_id:
+          type: integer
+          nullable: true
+
+    DoctorCreateRequest:
+      type: object
+      required:
+        - username
+        - name
+        - password
+        - doctor_email
+      properties:
+        username:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+        type:
+          type: string
+        dep_id:
+          type: integer
+          nullable: true
+        doctor_email:
+          type: string
+          format: email
+        qualification:
+          type: string
+        experience:
+          type: string
+        description:
+          type: string
+
+    DoctorUpdateRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+        type:
+          type: string
+        dep_id:
+          type: integer
+          nullable: true
+        email:
+          type: string
+          format: email
+        qualification:
+          type: string
+        experience:
+          type: string
+        description:
+          type: string
+
+    # ─── Patient ─────────────────────────────────────────────────────────────
+    Patient:
+      type: object
+      properties:
+        patient_id:
+          type: integer
+        patient_name:
+          type: string
+        patient_username:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        gender:
+          type: string
+        age:
+          type: integer
+        address:
+          type: string
+        is_blacklisted:
+          type: boolean
+
+    PatientRegisterRequest:
+      type: object
+      required:
+        - name
+        - username
+        - email
+        - password
+      properties:
+        name:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        gender:
+          type: string
+        age:
+          type: integer
+
+    PatientUpdateRequest:
+      type: object
+      properties:
+        patient_name:
+          type: string
+        patient_username:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        gender:
+          type: string
+        age:
+          type: integer
+        address:
+          type: string
+
+    # ─── Department ──────────────────────────────────────────────────────────
+    Department:
+      type: object
+      properties:
+        dep_id:
+          type: integer
+        dep_name:
+          type: string
+        dep_des:
+          type: string
+        no_docs_registered:
+          type: integer
+
+    DepartmentRequest:
+      type: object
+      required:
+        - dep_name
+      properties:
+        dep_name:
+          type: string
+        dep_des:
+          type: string
+
+    # ─── Appointment ─────────────────────────────────────────────────────────
+    Appointment:
+      type: object
+      properties:
+        app_id:
+          type: integer
+        patient_id:
+          type: integer
+        doctor_id:
+          type: integer
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+          format: time
+          example: "09:00"
+        status:
+          type: string
+          enum: [BOOKED, COMPLETED, CANCELLED]
+        visit_type:
+          type: string
+          enum: [Morning, Afternoon, Evening]
+        token_no:
+          type: integer
+          nullable: true
+          description: Queue position within the slot (patient dashboard only)
+
+    # ─── Treatment ───────────────────────────────────────────────────────────
+    Treatment:
+      type: object
+      properties:
+        treatment_id:
+          type: integer
+        app_id:
+          type: integer
+        diagnosis:
+          type: string
+        prescription:
+          type: string
+        medication:
+          type: string
+        tests_done:
+          type: string
+        next_visit_date:
+          type: string
+          format: date
+          nullable: true
+
+    TreatmentRequest:
+      type: object
+      properties:
+        diagnosis:
+          type: string
+        prescription:
+          type: string
+        medication:
+          type: string
+        tests_done:
+          type: string
+        next_visit_date:
+          type: string
+          format: date
+          nullable: true
+
+    # ─── Chat ────────────────────────────────────────────────────────────────
+    ChatMessage:
+      type: object
+      properties:
+        message_id:
+          type: integer
+        appointment_id:
+          type: integer
+        sender_role:
+          type: string
+          enum: [DOCTOR, PATIENT]
+        sender_id:
+          type: integer
+        message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ChatMessageRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+
+    # ─── Availability ────────────────────────────────────────────────────────
+    Availability:
+      type: object
+      properties:
+        availability_id:
+          type: integer
+        doctor_id:
+          type: integer
+        date:
+          type: string
+          format: date
+        slot_name:
+          type: string
+          enum: [Morning, Afternoon, Evening]
+        start_time:
+          type: string
+          example: "09:00"
+        end_time:
+          type: string
+          example: "12:00"
+
+    AvailabilitySetRequest:
+      type: object
+      description: >
+        Keys are ISO dates (YYYY-MM-DD) for the next 7 days.
+        Values are arrays of slot names to mark as available.
+      example:
+        availability:
+          "2025-07-01": ["Morning", "Evening"]
+          "2025-07-02": ["Afternoon"]
+      properties:
+        availability:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+              enum: [Morning, Afternoon, Evening]
+
+    # ─── Auth ────────────────────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PATHS
+# ═══════════════════════════════════════════════════════════════════════════════
+paths:
+
+  # ────────────────────────────── AUTH ────────────────────────────────────────
+
+  /api/auth/register/patient:
+    post:
+      tags: [Auth]
+      summary: Register a new patient account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientRegisterRequest'
+      responses:
+        "201":
+          description: Patient registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          patient:
+                            $ref: '#/components/schemas/Patient'
+        "400":
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/login/patient:
+    post:
+      tags: [Auth]
+      summary: Patient login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: Login successful — refresh token set as HttpOnly cookie
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          patient:
+                            $ref: '#/components/schemas/Patient'
+                          access_token:
+                            type: string
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: Account is blacklisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/login/doctor:
+    post:
+      tags: [Auth]
+      summary: Doctor login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: Login successful — refresh token set as HttpOnly cookie
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          doctor:
+                            $ref: '#/components/schemas/Doctor'
+                          access_token:
+                            type: string
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/login/admin:
+    post:
+      tags: [Auth]
+      summary: Admin login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: Login successful — refresh token set as HttpOnly cookie
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user_type:
+                            type: string
+                            example: admin
+                          access_token:
+                            type: string
+        "401":
+          description: Invalid admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (blacklists current access token and clears refresh cookie)
+      responses:
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Return the currently authenticated user's profile and role
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          role:
+                            type: string
+                            enum: [admin, doctor, patient]
+        "401":
+          description: Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ────────────────────────────── ADMIN ───────────────────────────────────────
+
+  /api/admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Admin dashboard — all doctors, patients, and 10 upcoming appointments
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          doctors:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Doctor'
+                          patients:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Patient'
+                          recent_appointments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Appointment'
+        "403":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/doctors:
+    get:
+      tags: [Admin]
+      summary: List all doctors (cached)
+      responses:
+        "200":
+          description: List of doctors
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          doctors:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Doctor'
+        "403":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Admin]
+      summary: Create a new doctor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoctorCreateRequest'
+      responses:
+        "201":
+          description: Doctor created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          doctor:
+                            $ref: '#/components/schemas/Doctor'
+        "400":
+          description: Username or email already exists, or department not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/doctors/search:
+    get:
+      tags: [Admin]
+      summary: Search doctors by name
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Partial name to search (case-insensitive)
+      responses:
+        "200":
+          description: Matching doctors
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          doctors:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Doctor'
+
+  /api/admin/doctors/{doctor_id}:
+    parameters:
+      - in: path
+        name: doctor_id
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Admin]
+      summary: Get a single doctor's details
+      responses:
+        "200":
+          description: Doctor details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          doctor:
+                            $ref: '#/components/schemas/Doctor'
+        "404":
+          description: Doctor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Admin]
+      summary: Update a doctor's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoctorUpdateRequest'
+      responses:
+        "200":
+          description: Doctor updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        "404":
+          description: Doctor or new department not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Admin]
+      summary: Delete a doctor
+      responses:
+        "200":
+          description: Doctor deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        "404":
+          description: Doctor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/patients:
+    get:
+      tags: [Admin]
+      summary: List all patients (cached)
+      responses:
+        "200":
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          patients:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Patient'
+
+  /api/admin/patients/{patient_id}:
+    parameters:
+      - in: path
+        name: patient_id
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Admin]
+      summary: Get a patient's details and all their appointments
+      responses:
+        "200":
+          description: Patient details with appointment history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          patient:
+                            $ref: '#/components/schemas/Patient'
+                          appointments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Appointment'
+        "404":
+          description: Patient not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Admin]
+      summary: Hard-delete a patient record
+      responses:
+        "200":
+          description: Patient deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/admin/patients/{patient_id}/history:
+    get:
+      tags: [Admin]
+      summary: Full appointment history for a patient (descending)
+      parameters:
+        - in: path
+          name: patient_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          patient:
+                            $ref: '#/components/schemas/Patient'
+                          appointments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Appointment'
+
+  /api/admin/patients/{patient_id}/blacklist:
+    post:
+      tags: [Admin]
+      summary: Blacklist a patient
+      parameters:
+        - in: path
+          name: patient_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient blacklisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/admin/patients/{patient_id}/unblacklist:
+    post:
+      tags: [Admin]
+      summary: Remove blacklist from a patient
+      parameters:
+        - in: path
+          name: patient_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient unblacklisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/admin/departments:
+    get:
+      tags: [Admin]
+      summary: List all departments (cached)
+      responses:
+        "200":
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          departments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Department'
+    post:
+      tags: [Admin]
+      summary: Create a new department
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepartmentRequest'
+      responses:
+        "201":
+          description: Department created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        "400":
+          description: Department name is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/departments/{dep_id}:
+    parameters:
+      - in: path
+        name: dep_id
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Admin]
+      summary: Get a department's details (cached)
+      responses:
+        "200":
+          description: Department details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+    put:
+      tags: [Admin]
+      summary: Update a department
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepartmentRequest'
+      responses:
+        "200":
+          description: Department updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+    delete:
+      tags: [Admin]
+      summary: Delete a department
+      responses:
+        "200":
+          description: Department deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/admin/appointments:
+    get:
+      tags: [Admin]
+      summary: List all appointments with optional filters
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [BOOKED, COMPLETED, CANCELLED]
+        - in: query
+          name: doctor_id
+          schema:
+            type: integer
+        - in: query
+          name: patient_id
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Filtered appointment list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          appointments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Appointment'
+
+  /api/admin/reminders/trigger:
+    post:
+      tags: [Admin]
+      summary: Manually trigger the daily appointment reminder Celery task
+      responses:
+        "200":
+          description: Reminder task queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task_id:
+                            type: string
+
+  /api/admin/reports/trigger:
+    post:
+      tags: [Admin]
+      summary: Manually trigger the monthly report Celery task
+      responses:
+        "200":
+          description: Monthly report task queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task_id:
+                            type: string
+
+  # ────────────────────────────── DOCTOR ──────────────────────────────────────
+
+  /api/doctor/dashboard:
+    get:
+      tags: [Doctor]
+      summary: Doctor dashboard — own profile, BOOKED appointments, assigned patients
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          doctor:
+                            $ref: '#/components/schemas/Doctor'
+                          appointments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Appointment'
+                          assigned_patients:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Patient'
+
+  /api/doctor/patients/{patient_id}:
+    get:
+      tags: [Doctor]
+      summary: View a patient's full record and appointment history
+      parameters:
+        - in: path
+          name: patient_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient profile with appointment history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          patient:
+                            $ref: '#/components/schemas/Patient'
+                          appointments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Appointment'
+
+  /api/doctor/patients/{patient_id}/blacklist:
+    post:
+      tags: [Doctor]
+      summary: Blacklist a patient (doctor action)
+      parameters:
+        - in: path
+          name: patient_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient blacklisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/doctor/patients/{patient_id}/unblacklist:
+    post:
+      tags: [Doctor]
+      summary: Remove blacklist from a patient (doctor action)
+      parameters:
+        - in: path
+          name: patient_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient unblacklisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/doctor/patients/{patient_id}/summary:
+    post:
+      tags: [Doctor]
+      summary: Generate an AI clinical summary for a patient using Gemini Flash
+      parameters:
+        - in: path
+          name: patient_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: AI-generated clinical summary
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          summary:
+                            type: string
+                            description: 4–6 sentence clinical narrative
+        "400":
+          description: Not enough treatment history to generate a summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "503":
+          description: Gemini API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/doctor/appointments/{app_id}/complete:
+    post:
+      tags: [Doctor]
+      summary: Mark a BOOKED appointment as COMPLETED
+      parameters:
+        - in: path
+          name: app_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Appointment marked as completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        "400":
+          description: Appointment is not in BOOKED status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: Appointment belongs to a different doctor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/doctor/appointments/{app_id}/cancel:
+    post:
+      tags: [Doctor]
+      summary: Cancel a BOOKED appointment
+      parameters:
+        - in: path
+          name: app_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Appointment cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        "400":
+          description: Appointment already completed or cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/doctor/appointments/{app_id}/treatment:
+    parameters:
+      - in: path
+        name: app_id
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Doctor]
+      summary: Retrieve treatment details for an appointment
+      responses:
+        "200":
+          description: Appointment and treatment data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          appointment:
+                            $ref: '#/components/schemas/Appointment'
+                          treatment:
+                            $ref: '#/components/schemas/Treatment'
+    post:
+      tags: [Doctor]
+      summary: Create or update treatment details for an appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TreatmentRequest'
+      responses:
+        "200":
+          description: Treatment saved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Treatment'
+
+  /api/doctor/appointments/history:
+    get:
+      tags: [Doctor]
+      summary: List the doctor's COMPLETED and CANCELLED appointments
+      responses:
+        "200":
+          description: Appointment history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          appointments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Appointment'
+
+  /api/doctor/availability:
+    get:
+      tags: [Doctor]
+      summary: Get the doctor's availability for the next 7 days
+      responses:
+        "200":
+          description: Slots map for the next 7 days
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          dates:
+                            type: array
+                            items:
+                              type: string
+                              format: date
+                          slots:
+                            type: object
+                            description: Slot definitions with start/end times
+                          slots_map:
+                            type: object
+                            description: >
+                              Nested object — date → slot → boolean indicating availability
+    post:
+      tags: [Doctor]
+      summary: Set or replace availability for the next 7 days
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvailabilitySetRequest'
+      responses:
+        "200":
+          description: Availability updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/doctor/appointments/{app_id}/close-chat:
+    post:
+      tags: [Doctor]
+      summary: Close the follow-up chat window for a completed appointment
+      parameters:
+        - in: path
+          name: app_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chat closed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        "400":
+          description: Appointment is not completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: Doctor does not own this appointment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ────────────────────────────── PATIENT ─────────────────────────────────────
+
+  /api/patient/dashboard:
+    get:
+      tags: [Patient]
+      summary: Patient dashboard — own profile, departments, upcoming BOOKED appointments with queue tokens
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          patient:
+                            $ref: '#/components/schemas/Patient'
+                          departments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Department'
+                          appointments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Appointment'
+
+  /api/patient/history:
+    get:
+      tags: [Patient]
+      summary: Patient's full appointment history (all statuses, descending)
+      responses:
+        "200":
+          description: Appointment history with treatment details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          patient:
+                            $ref: '#/components/schemas/Patient'
+                          appointments:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Appointment'
+
+  /api/patient/profile:
+    put:
+      tags: [Patient]
+      summary: Update the authenticated patient's own profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientUpdateRequest'
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Patient'
+        "400":
+          description: Username or email already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/patient/departments/{dep_id}:
+    get:
+      tags: [Patient]
+      summary: View a department and its list of doctors
+      parameters:
+        - in: path
+          name: dep_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Department and doctors
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          department:
+                            $ref: '#/components/schemas/Department'
+                          doctors:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Doctor'
+
+  /api/patient/doctors/{doctor_id}:
+    get:
+      tags: [Patient]
+      summary: View a doctor's profile, availability, and per-slot booking counts
+      parameters:
+        - in: path
+          name: doctor_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Doctor details with availability
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          doctor:
+                            $ref: '#/components/schemas/Doctor'
+                          availability:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Availability'
+                          slot_bookings:
+                            type: object
+                            description: availability_id → current booking count
+                            additionalProperties:
+                              type: integer
+                          slot_capacity:
+                            type: integer
+                            example: 10
+
+  /api/patient/book/{availability_id}:
+    post:
+      tags: [Patient]
+      summary: Book an appointment for a given availability slot
+      parameters:
+        - in: path
+          name: availability_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Appointment booked successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Appointment'
+        "400":
+          description: Slot is in the past
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "409":
+          description: Slot fully booked or patient already has an appointment at this time
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/patient/appointments/{appointment_id}/cancel:
+    post:
+      tags: [Patient]
+      summary: Cancel a patient's own BOOKED appointment
+      parameters:
+        - in: path
+          name: appointment_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Appointment cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        "400":
+          description: Appointment already completed or cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: Appointment belongs to a different patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/patient/export/csv:
+    post:
+      tags: [Patient]
+      summary: Queue a Celery task to email the patient their appointment history as CSV
+      responses:
+        "200":
+          description: Export task queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task_id:
+                            type: string
+        "400":
+          description: No email address on file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ────────────────────────────── CHAT ────────────────────────────────────────
+
+  /api/appointments/{app_id}/messages:
+    parameters:
+      - in: path
+        name: app_id
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Chat]
+      summary: >
+        Retrieve all chat messages for a completed appointment.
+        Returns a chat_open flag indicating whether new messages can still be sent
+        (within 48 h of completion and not manually closed by the doctor).
+      responses:
+        "200":
+          description: Chat messages and open/closed state
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          messages:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ChatMessage'
+                          chat_open:
+                            type: boolean
+        "403":
+          description: Appointment not completed, or user is not the doctor/patient for this appointment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Chat]
+      summary: Send a message in a completed appointment's chat thread
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessageRequest'
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ChatMessage'
+        "400":
+          description: Empty message body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: Chat closed, 48-hour window expired, or unauthorized user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Auth
+    description: Registration, login, logout, and session info
+  - name: Admin
+    description: Admin-only management of doctors, patients, departments, appointments, and background tasks
+  - name: Doctor
+    description: Doctor-facing endpoints for appointments, treatments, availability, and patient management
+  - name: Patient
+    description: Patient-facing endpoints for booking, history, profile, and data export
+  - name: Chat
+    description: Post-appointment follow-up chat between doctor and patient (48-hour window)
